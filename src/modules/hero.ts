@@ -3,7 +3,7 @@ import {Module} from './module';
 
 export type Hero = { id: string }
 
-var raf = (typeof window !== 'undefined' && window.requestAnimationFrame) || setTimeout;
+var raf = (typeof window !== 'undefined' && (window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : undefined)) || setTimeout;
 var nextFrame = function(fn: any) { raf(function() { raf(fn); }); };
 
 function setNextFrame(obj: any, prop: string, val: any): void {

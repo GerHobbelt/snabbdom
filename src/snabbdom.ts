@@ -70,7 +70,8 @@ export function init(modules: Array<Partial<Module>>, domApi?: DOMAPI) {
     return function rmCb() {
       if (--listeners === 0) {
         const parent = api.parentNode(childElm);
-        api.removeChild(parent, childElm);
+        if (parent != null)
+            api.removeChild(parent, childElm);
       }
     };
   }
@@ -176,6 +177,23 @@ export function init(modules: Array<Partial<Module>>, domApi?: DOMAPI) {
     }
   }
 
+  function findIndex(children: Array<VNode>, startIdx: number, endIdx: number, f: (_: VNode) => boolean): number {
+    var i = startIdx
+    while (i <= endIdx) {
+      if (f(children[i])) return i;
+      i++;
+    }
+    return -1;
+  }
+  function findIndexRev(children: Array<VNode>, startIdx: number, endIdx: number, f: (_: VNode) => boolean): number {
+    var i = endIdx
+    while (i >= startIdx) {
+      if (f(children[i])) return i;
+      i--;
+    }
+    return -1;
+  }
+
   function updateChildren(parentElm: Node,
                           oldCh: Array<VNode>,
                           newCh: Array<VNode>,
@@ -201,6 +219,44 @@ export function init(modules: Array<Partial<Module>>, domApi?: DOMAPI) {
         newStartVnode = newCh[++newStartIdx];
       } else if (newEndVnode == null) {
         newEndVnode = newCh[--newEndIdx];
+      } else if (isDef(newStartVnode.elm)) {
+        if (newStartVnode.elm == oldStartVnode.elm) {
+          oldStartVnode = oldCh[++oldStartIdx];
+          newStartVnode = newCh[++newStartIdx];
+        } else if (newStartVnode.elm == oldEndVnode.elm) {
+          api.insertBefore(parentElm, (oldEndVnode.elm as Node), oldStartVnode.elm as Node);
+          oldEndVnode = oldCh[--oldEndIdx];
+          newStartVnode = newCh[++newStartIdx];
+        } else {
+          idxInOld = findIndex(oldCh, oldStartIdx + 1, oldEndIdx - 1, x => isDef(x) && newStartVnode.elm == x.elm);
+          if (idxInOld == -1) {
+            newStartVnode.elm = undefined as any;
+          } else {
+            elmToMove = oldCh[idxInOld];
+            oldCh[idxInOld] = undefined as any;
+            api.insertBefore(parentElm, (elmToMove.elm as Node), oldStartVnode.elm as Node);
+            newStartVnode = newCh[++newStartIdx];
+          }
+        }
+      } else if (isDef(newEndVnode.elm)) {
+        if (newEndVnode.elm == oldEndVnode.elm) {
+          oldEndVnode = oldCh[--oldEndIdx];
+          newEndVnode = newCh[--newEndIdx];
+        } else if (newEndVnode.elm == oldStartVnode.elm) {
+          api.insertBefore(parentElm, (oldStartVnode.elm as Node), api.nextSibling(oldEndVnode.elm as Node));
+          oldStartVnode = oldCh[++oldStartIdx];
+          newEndVnode = newCh[--newEndIdx];
+        } else {
+          idxInOld = findIndexRev(oldCh, oldStartIdx + 1, oldEndIdx - 1, x => isDef(x) && newEndVnode.elm == x.elm);
+          if (idxInOld == -1) {
+            newEndVnode.elm = undefined as any;
+          } else {
+            elmToMove = oldCh[idxInOld];
+            oldCh[idxInOld] = undefined as any;
+            api.insertBefore(parentElm,(elmToMove.elm as Node), api.nextSibling(oldEndVnode.elm as Node));
+            newEndVnode = newCh[--newEndIdx];
+          }
+        }
       } else if (sameVnode(oldStartVnode, newStartVnode)) {
         patchVnode(oldStartVnode, newStartVnode, insertedVnodeQueue);
         oldStartVnode = oldCh[++oldStartIdx];
